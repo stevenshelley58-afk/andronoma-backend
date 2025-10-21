@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Andronoma Ad Gen - AI Audience Generator</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const API_URL = 'https://andronoma-backend.onrender.com/api/v1';
+
+        function App() {
+            const [loading, setLoading] = useState(false);
+            const [user, setUser] = useState(null);
+            const [personas, setPersonas] = useState([]);
+            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [formData, setFormData] = useState({
+                businessDescription: '',
+                productService: '',
+                targetGoals: '',
+                numPersonas: 3
+            });
+
+            useEffect(() => {
+                if (user) {
+                    fetchPersonas();
+                }
+            }, [user]);
+
+            const login = async (email, password) => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API_URL}/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        setUser(data.data.user);
+                        localStorage.setItem('token', data.data.token);
+                    } else {
+                        alert('Invalid credentials');
+                    }
+                } catch (err) {
+                    alert('Login failed: ' + err.message);
+                }
+                setLoading(false);
+            };
+
+            const fetchPersonas = async () => {
+                try {
+                    const res = await fetch(`${API_URL}/audiences`);
+                    const data = await res.json();
+                    if (data.success) {
+                        setPersonas(data.data.personas || []);
+                    }
+                } catch (err) {
+                    console.error('Fetch failed:', err);
+                }
+            };
+
+            const generatePersonas = async () => {
+                if (!formData.businessDescription || !formData.productService) {
+                    alert('Please fill in business and product fields');
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API_URL}/audiences/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        alert(`✅ Generated ${data.data.personas.length} personas!\nCost: $${data.data.metadata.costUSD}\nTokens: ${data.data.metadata.tokensUsed}`);
+                        await fetchPersonas();
+                        setCurrentPage('audiences');
+                    } else {
+                        alert('Generation failed: ' + data.error);
+                    }
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                }
+                setLoading(false);
+            };
+
+            const deletePersona = async (id) => {
+                if (!confirm('Delete this persona?')) return;
+                try {
+                    await fetch(`${API_URL}/audiences/${id}`, { method: 'DELETE' });
+                    await fetchPersonas();
+                } catch (err) {
+                    alert('Delete failed: ' + err.message);
+                }
+            };
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4">
+                        <div className="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md">
+                            <h1 className="text-3xl font-bold text-white mb-6 text-center">
+                                🎯 Andronoma Ad Gen
+                            </h1>
+                            <p className="text-gray-400 text-center mb-8">
+                                AI-Powered Audience Generation
+                            </p>
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => login('demo@example.com', 'demo123')}
+                                    disabled={loading}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition disabled:opacity-50"
+                                >
+                                    {loading ? 'Logging in...' : 'Login as Demo User'}
+                                </button>
+                                <button
+                                    onClick={() => login('admin@andronoma.ai', 'admin123')}
+                                    disabled={loading}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition disabled:opacity-50"
+                                >
+                                    {loading ? 'Logging in...' : 'Login as Admin'}
+                                </button>
+                            </div>
+                            <p className="text-gray-500 text-sm text-center mt-6">
+                                Demo: demo@example.com / demo123<br/>
+                                Admin: admin@andronoma.ai / admin123
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen flex">
+                    {/* Sidebar */}
+                    <div className="w-64 bg-gray-900 p-6">
+                        <h1 className="text-2xl font-bold text-white mb-8">🎯 Andronoma</h1>
+                        <nav className="space-y-2">
+                            <button
+                                onClick={() => setCurrentPage('dashboard')}
+                                className={`w-full text-left px-4 py-3 rounded-lg transition ${currentPage === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
+                            >
+                                📊 Dashboard
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage('generate')}
+                                className={`w-full text-left px-4 py-3 rounded-lg transition ${currentPage === 'generate' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
+                            >
+                                ✨ Generate
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage('audiences')}
+                                className={`w-full text-left px-4 py-3 rounded-lg transition ${currentPage === 'audiences' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800'}`}
+                            >
+                                👥 Audiences ({personas.length})
+                            </button>
+                        </nav>
+                        <button
+                            onClick={() => setUser(null)}
+                            className="w-full mt-auto pt-6 text-gray-400 hover:text-white transition"
+                        >
+                            🚪 Logout
+                        </button>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 p-8 overflow-auto">
+                        {currentPage === 'dashboard' && (
+                            <div>
+                                <h2 className="text-3xl font-bold text-white mb-6">Dashboard</h2>
+                                <div className="grid grid-cols-3 gap-6 mb-8">
+                                    <div className="bg-gray-800 p-6 rounded-lg">
+                                        <p className="text-gray-400 text-sm">Total Personas</p>
+                                        <p className="text-3xl font-bold text-white mt-2">{personas.length}</p>
+                                    </div>
+                                    <div className="bg-gray-800 p-6 rounded-lg">
+                                        <p className="text-gray-400 text-sm">Status</p>
+                                        <p className="text-3xl font-bold text-green-400 mt-2">Active</p>
+                                    </div>
+                                    <div className="bg-gray-800 p-6 rounded-lg">
+                                        <p className="text-gray-400 text-sm">Backend</p>
+                                        <p className="text-lg font-bold text-blue-400 mt-2">✅ Connected</p>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-800 p-6 rounded-lg">
+                                    <h3 className="text-xl font-bold text-white mb-4">Recent Personas</h3>
+                                    {personas.slice(0, 3).map(p => (
+                                        <div key={p.id} className="mb-4 pb-4 border-b border-gray-700 last:border-0">
+                                            <h4 className="text-white font-semibold">{p.name}</h4>
+                                            <p className="text-gray-400 text-sm">{p.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {currentPage === 'generate' && (
+                            <div>
+                                <h2 className="text-3xl font-bold text-white mb-6">Generate Personas</h2>
+                                <div className="bg-gray-800 p-6 rounded-lg max-w-2xl">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-white mb-2">Business Description</label>
+                                            <textarea
+                                                value={formData.businessDescription}
+                                                onChange={e => setFormData({...formData, businessDescription: e.target.value})}
+                                                className="w-full bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                                rows="3"
+                                                placeholder="E.g., Online fitness coaching platform..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-white mb-2">Product/Service</label>
+                                            <input
+                                                type="text"
+                                                value={formData.productService}
+                                                onChange={e => setFormData({...formData, productService: e.target.value})}
+                                                className="w-full bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                                placeholder="E.g., 12-week transformation program"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-white mb-2">Target Goals</label>
+                                            <input
+                                                type="text"
+                                                value={formData.targetGoals}
+                                                onChange={e => setFormData({...formData, targetGoals: e.target.value})}
+                                                className="w-full bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                                placeholder="E.g., Increase sign-ups, boost engagement"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-white mb-2">Number of Personas</label>
+                                            <input
+                                                type="number"
+                                                value={formData.numPersonas}
+                                                onChange={e => setFormData({...formData, numPersonas: parseInt(e.target.value)})}
+                                                className="w-full bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                                min="1"
+                                                max="5"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={generatePersonas}
+                                            disabled={loading}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition disabled:opacity-50"
+                                        >
+                                            {loading ? '⏳ Generating with AI...' : '✨ Generate Personas'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {currentPage === 'audiences' && (
+                            <div>
+                                <h2 className="text-3xl font-bold text-white mb-6">Your Audiences ({personas.length})</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {personas.map(p => (
+                                        <div key={p.id} className="bg-gray-800 p-6 rounded-lg hover:shadow-xl transition">
+                                            <h3 className="text-xl font-bold text-white mb-2">{p.name}</h3>
+                                            <p className="text-gray-400 text-sm mb-4">{p.description}</p>
+                                            <div className="space-y-2 text-sm">
+                                                <p className="text-gray-300">👤 Age: {p.ageRange}</p>
+                                                <p className="text-gray-300">📍 Location: {p.location}</p>
+                                                <p className="text-gray-300">💰 Income: {p.income}</p>
+                                                <p className="text-gray-300">🎓 Education: {p.education}</p>
+                                                <div className="pt-2">
+                                                    <p className="text-gray-400 mb-1">Interests:</p>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {p.interests?.slice(0, 3).map((interest, i) => (
+                                                            <span key={i} className="bg-blue-900 text-blue-200 px-2 py-1 rounded text-xs">
+                                                                {interest}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => deletePersona(p.id)}
+                                                className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded transition"
+                                            >
+                                                🗑️ Delete
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                {personas.length === 0 && (
+                                    <div className="text-center text-gray-400 py-12">
+                                        <p className="text-xl mb-2">No personas yet</p>
+                                        <p>Generate your first AI-powered audience!</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</body>
+</html>
